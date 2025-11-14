@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useGameWindow } from './useGameWindow'; // Impor hook responsif
+import { useGameWindow } from './useGameWindow';
 
 // ==========================================================
 // ## 📝 KONFIGURASI & KONSTANTA
@@ -13,7 +13,12 @@ const TEXTS = {
   pause: ["Paused - Press P to Resume", "Jeda - Tekan P untuk Lanjut"],
   lang_select: ["Please select a language", "Silakan pilih bahasa"],
   instructions_menu: ["Help Gatotkaca catch Batik Patterns, Avoid BOMBS!", "Bantu Gatotkaca menangkap Pola Batik, Hindari BOM!"],
-  start_instructions: ["Press SPACE to Start. Use ARROW KEYS to move. Press the P key to Pause", "Tekan SPASI untuk Mulai. Gunakan TOMBOL PANAH untuk bergerak. Tekan Tombol P untuk Jeda"]
+  start_instructions: ["Press SPACE to Start. Use ARROW KEYS to move. Press the P key to Pause", "Tekan SPASI untuk Mulai. Gunakan TOMBOL PANAH untuk bergerak. Tekan Tombol P untuk Jeda"],
+  start_btn: ["START", "MULAI"],
+  pause_btn: ["PAUSE", "JEDA"],
+  resume_btn: ["RESUME", "LANJUT"],
+  restart_btn: ["RESTART", "MULAI ULANG"],
+  credit: ["Created by Abu Sofian", "Dibuat oleh Abu Sofian"]
 };
 
 const GAME_WIDTH = 800;
@@ -29,16 +34,14 @@ const MIN_SPAWN_DISTANCE = 100;
 // ==========================================================
 
 const WaveRiderGame = () => {
-  const windowSize = useGameWindow(); // Gunakan hook responsif
+  const windowSize = useGameWindow();
 
-  // --- State UI ---
   const [gameState, setGameState] = useState('MENU');
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
   const [language, setLanguage] = useState(0);
   const [imagesLoaded, setImagesLoaded] = useState(false);
 
-  // --- Refs Game Logic ---
   const canvasRef = useRef(null);
   const requestRef = useRef(0);
   const lastTimeRef = useRef(0);
@@ -54,13 +57,12 @@ const WaveRiderGame = () => {
   const keysPressed = useRef({});
   const speedMultiplier = useRef(1.0);
 
-  // --- Refs untuk menyimpan Objek Gambar ---
   const imagesRef = useRef({
     bg: null, bomb: null, collect: [], 'gatot-1': null, 'gatot-2': null, 'gatot-hit': null, 'gatot-collect': null
   });
 
   // ==========================================================
-  // ## 🏞️ LOADING ASSETS (ASPEK RASIO & INIT)
+  // ## 🏞️ LOADING ASSETS
   // ==========================================================
 
   useEffect(() => {
@@ -89,7 +91,6 @@ const WaveRiderGame = () => {
         loadedCount++;
 
         if (loadedCount === totalImages) {
-          // Hitung Aspect Ratio Player
           const gatotImage = imagesRef.current['gatot-1'];
           if (gatotImage) {
             const originalWidth = gatotImage.width;
@@ -116,12 +117,48 @@ const WaveRiderGame = () => {
   }, []);
 
   // ==========================================================
+  // ## 🖱️ HANDLERS SENTUH
+  // ==========================================================
+
+  const keyMap = {
+    'btn-up': 'ArrowUp', 'btn-down': 'ArrowDown', 'btn-left': 'ArrowLeft', 'btn-right': 'ArrowRight',
+  };
+
+  const handleTouchStart = (code) => (e) => {
+    e.preventDefault();
+    if (gameState === 'PLAYING') {
+      keysPressed.current[keyMap[code]] = true;
+    }
+  };
+
+  const handleTouchEnd = (code) => (e) => {
+    e.preventDefault();
+    keysPressed.current[keyMap[code]] = false;
+  };
+
+
+  // ==========================================================
   // ## ⌨️ INPUT & STATE LOGIC
   // ==========================================================
 
+  const handleAction = (actionType) => (e) => {
+    e.preventDefault();
+    if (actionType === 'start' && gameState === 'MENU') {
+      startGame();
+    } else if (actionType === 'pause') {
+      if (gameState === 'PLAYING') setGameState('PAUSED');
+      else if (gameState === 'PAUSED') {
+        lastTimeRef.current = performance.now();
+        setGameState('PLAYING');
+      }
+    } else if (actionType === 'restart' && gameState === 'GAMEOVER') {
+      resetGame();
+    }
+  };
+
+
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // FIX BUG SPASI: Mencegah scroll browser
       if (e.code === 'Space' && gameState === 'MENU') {
         e.preventDefault();
       }
@@ -191,7 +228,7 @@ const WaveRiderGame = () => {
 
 
   // ==========================================================
-  // ## 🔄 GAME LOOP CORE (RANDOM SIZE)
+  // ## 🔄 GAME LOOP CORE
   // ==========================================================
 
   const update = (time) => {
@@ -254,7 +291,6 @@ const WaveRiderGame = () => {
     // 4. Spawning Logic (RANDOM SIZE)
     const allItems = [...obstaclesRef.current, ...collectiblesRef.current];
 
-    // Obstacle Size: 40 to 85
     if (Math.random() < 0.02) {
       const obsSize = Math.floor(Math.random() * (85 - 40 + 1)) + 40;
       const newObs = { x: GAME_WIDTH + 50, y: Math.random() * (GAME_HEIGHT - 100) + 50, width: obsSize, height: obsSize, type: 'bomb' };
@@ -263,7 +299,6 @@ const WaveRiderGame = () => {
       }
     }
 
-    // Collectible Size: 35 to 70
     if (Math.random() < 0.015) {
       const colSize = Math.floor(Math.random() * (70 - 35 + 1)) + 35;
       const newCol = { x: GAME_WIDTH + 50, y: Math.random() * (GAME_HEIGHT - 100) + 50, width: colSize, height: colSize, type: `collect-${Math.floor(Math.random() * imagesRef.current.collect.length)}` };
@@ -290,7 +325,6 @@ const WaveRiderGame = () => {
 
     if (imgs.bg) ctx.drawImage(imgs.bg, 0, 0, GAME_WIDTH, GAME_HEIGHT);
 
-    // Hanya gambar entitas dan player jika TIDAK di MENU
     if (gameState !== 'MENU') {
       // 2. Draw Entities
       obstaclesRef.current.forEach(obs => { if (imgs.bomb) ctx.drawImage(imgs.bomb, obs.x, obs.y, obs.width, obs.height); });
@@ -335,11 +369,68 @@ const WaveRiderGame = () => {
     </button>
   );
 
-  if (!imagesLoaded) return <div style={{ textAlign: 'center', marginTop: 50 }}>Loading Assets...</div>;
+  // --- Komponen Tombol Sentuh (Rectangular Movement Button) ---
+  const TouchButton = ({ symbol, code }) => (
+    <button
+      key={code}
+      onContextMenu={(e) => e.preventDefault()}
+      onTouchStart={handleTouchStart(code)}
+      onTouchEnd={handleTouchEnd(code)}
+      onMouseDown={handleTouchStart(code)}
+      onMouseUp={handleTouchEnd(code)}
+      style={{
+        width: '70px',
+        height: '40px',
+        borderRadius: '5px',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        border: '2px solid rgba(255, 255, 255, 0.7)',
+        color: 'white',
+        fontSize: '18px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        zIndex: 100,
+        flexShrink: 0,
+        // --- FIX CENTERING ICONS ---
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center'
+        // --------------------------
+      }}
+    >
+      {symbol}
+    </button>
+  );
 
-  // ==========================================================
-  // ## 💻 RENDER (JSX) (RESPONSIVE)
-  // ==========================================================
+  // --- Komponen Tombol Aksi (Rectangular Action Button) ---
+  const ActionButton = ({ label, actionType }) => (
+    <button
+      onClick={handleAction(actionType)}
+      style={{
+        width: '80px',
+        height: '80px',
+        borderRadius: '5px',
+        backgroundColor: actionType === 'start' ? 'rgba(0, 150, 0, 0.7)' :
+          actionType === 'pause' ? 'rgba(255, 165, 0, 0.7)' :
+            'rgba(150, 0, 0, 0.7)',
+        border: '2px solid white',
+        color: 'white',
+        // --- FIX OVERFLOW/CENTERING ---
+        fontSize: '14px', // Dikurangi agar label panjang muat
+        fontWeight: 'bold',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        textAlign: 'center',
+        // ------------------------------
+        zIndex: 100,
+      }}
+    >
+      {label}
+    </button>
+  );
+
+
+  if (!imagesLoaded) return <div style={{ textAlign: 'center', marginTop: 50 }}>Loading Assets...</div>;
 
   return (
     <div
@@ -358,7 +449,6 @@ const WaveRiderGame = () => {
           boxShadow: '0 0 20px rgba(0,0,0,0.8)',
           border: '2px solid #555',
 
-          // Kunci Responsiveness: Menerapkan skala dari hook useGameWindow
           transform: `scale(${windowSize.scale})`,
           transformOrigin: 'center center',
         }}
@@ -375,6 +465,45 @@ const WaveRiderGame = () => {
           <div>{TEXTS.lives[language]} {lives}</div>
         </div>
 
+        {/* ========================================================== */}
+        {/* VIRTUAL RECTANGULAR CONTROLS (LAYAR KECIL) */}
+        {windowSize.scale < 1.0 && (gameState !== 'MENU') && (
+          <>
+            {/* 1. MOVEMENT PAD (Kiri Bawah - Layout Cross) */}
+            <div style={{
+              position: 'absolute', bottom: 15, left: 15,
+              display: 'flex', flexDirection: 'column',
+              width: '220px',
+              gap: '5px'
+            }}>
+
+              {/* BARIS 1: UP (Sejajar Vertikal dengan DOWN) */}
+              <div style={{ display: 'flex', marginLeft: '75px' }}>
+                <TouchButton symbol="↑" code="btn-up" />
+              </div>
+
+              {/* BARIS 2: LEFT - DOWN - RIGHT (Horizontal Axis) */}
+              <div style={{ display: 'flex', gap: '5px' }}>
+                <TouchButton symbol="←" code="btn-left" />
+                <TouchButton symbol="↓" code="btn-down" />
+                <TouchButton symbol="→" code="btn-right" />
+              </div>
+            </div>
+
+            {/* 2. ACTION BUTTONS (Kanan Bawah) - Hanya tampil Pause/Resume */}
+            <div style={{ position: 'absolute', bottom: 15, right: 15 }}>
+              {gameState === 'PLAYING' && (
+                <ActionButton label={TEXTS.pause_btn[language]} actionType="pause" />
+              )}
+              {gameState === 'PAUSED' && (
+                <ActionButton label={TEXTS.resume_btn[language]} actionType="pause" />
+              )}
+            </div>
+          </>
+        )}
+        {/* ========================================================== */}
+
+
         {/* Menu Overlay */}
         {gameState === 'MENU' && (
           <div style={{
@@ -390,18 +519,27 @@ const WaveRiderGame = () => {
             }}>
               {TEXTS.title[language]}
             </h1>
+            {/* --- Teks Credit Title --- */}
+            <p style={{
+              fontSize: '16px', color: 'black', marginTop: '5px',
+              backgroundColor: 'rgba(255,255,255,0.7)', padding: '2px 10px', borderRadius: '5px'
+            }}>
+              {TEXTS.credit[language]}
+            </p>
+            {/* --------------------------- */}
 
             {/* Seleksi Bahasa */}
             <div style={{
-              marginTop: '10px'
-
+              marginTop: '20px', // FIX: Dinaikkan ke 20px
+              backgroundColor: 'rgba(255,255,255,0.85)', padding: '10px 20px', borderRadius: '8px',
+              border: '1px solid #333', color: 'black',
+              display: 'flex', flexDirection: 'column', alignItems: 'center'
             }}>
-              <p style={{
-                backgroundColor: 'rgba(255,255,255,0.85)', padding: '10px 20px', borderRadius: '8px',
-                border: '1px solid #333', color: 'black'
-              }}>{TEXTS.lang_select[language]}</p>
-              <Button onClick={() => setLanguage(0)} label="English" active={language === 0} />
-              <Button onClick={() => setLanguage(1)} label="Indonesia" active={language === 1} />
+              <p style={{ marginBottom: '10px', fontSize: '18px', fontWeight: 'bold' }}>{TEXTS.lang_select[language]}</p>
+              <div>
+                <Button onClick={() => setLanguage(0)} label="English" active={language === 0} />
+                <Button onClick={() => setLanguage(1)} label="Indonesia" active={language === 1} />
+              </div>
             </div>
 
             {/* Instruksi Besar */}
@@ -413,14 +551,20 @@ const WaveRiderGame = () => {
               {language === 0 ? TEXTS.instructions_menu[0] : TEXTS.instructions_menu[1]}
             </div>
 
-            {/* Press Space to Start */}
-            <div style={{
-              position: 'absolute', bottom: 15, width: '90%',
-              backgroundColor: 'rgba(255,255,255,0.85)', padding: '5px', borderRadius: '5px',
-              color: 'black', fontSize: '16px', border: '1px solid #333'
-            }}>
-              {TEXTS.start_instructions[language]}
-            </div>
+            {/* Press Space to Start / Start Button (Layar Kecil) */}
+            {windowSize.scale >= 1.0 ? (
+              <div style={{
+                position: 'absolute', bottom: 15, width: '90%',
+                backgroundColor: 'rgba(255,255,255,0.85)', padding: '5px', borderRadius: '5px',
+                color: 'black', fontSize: '16px', border: '1px solid #333'
+              }}>
+                {TEXTS.start_instructions[language]}
+              </div>
+            ) : (
+              <div style={{ position: 'absolute', bottom: 15, right: 15 }}>
+                <ActionButton label={TEXTS.start_btn[language]} actionType="start" />
+              </div>
+            )}
           </div>
         )}
 
@@ -434,6 +578,13 @@ const WaveRiderGame = () => {
             <h2 style={{ fontSize: '50px', color: 'black', textShadow: 'none' }}>GAME OVER</h2>
             <p style={{ fontSize: '30px', margin: '20px 0' }}>{TEXTS.score[language]} {score}</p>
             <p style={{ color: 'black' }}>{TEXTS.gameOver[language]}</p>
+
+            {/* Tombol Restart di dalam Overlay (khusus layar kecil) */}
+            {windowSize.scale < 1.0 && (
+              <div style={{ position: 'absolute', bottom: 15, right: 15 }}>
+                <ActionButton label={TEXTS.restart_btn[language]} actionType="restart" />
+              </div>
+            )}
           </div>
         )}
 
